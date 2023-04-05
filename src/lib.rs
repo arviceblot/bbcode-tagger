@@ -134,7 +134,7 @@ impl BBNode {
 }
 
 #[allow(dead_code)]
-struct BBCode {
+pub struct BBCode {
     open_matcher: Regex,
     close_matcher: Regex,
 }
@@ -149,7 +149,7 @@ impl Default for BBCode {
 
 impl BBCode {
     #[allow(dead_code)]
-    pub fn parse(&self, input: &str) -> Rc<RefCell<BBNode>> {
+    pub fn parse(&self, input: &str) -> BBNode {
         // Slice through string until open or close tag match
         let mut slice = &input[0..];
 
@@ -215,7 +215,7 @@ impl BBCode {
             }
         }
         // println!("{}", root.borrow());
-        root
+        root.take()
     }
 }
 
@@ -277,8 +277,7 @@ mod tests {
         let parser = BBCode::default();
         // let result = parser.parse("[b]hello[/b]");
         let result = parser.parse(r#"[i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something"#);
-        let item = result.take();
-        println!("{}", item);
+        println!("{}", result);
 
         // assert_eq!("".to_string(), result.borrow().text);
         // assert_eq!(BBTag::None, result.borrow().tag);
