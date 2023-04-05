@@ -2,6 +2,7 @@
 name = "bbcode-tagger"
 version = "0.1.0"
 authors = ["arviceblot <github@relay.arviceblot.com>"]
+description = "BBCode tree parser and tagger"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/arviceblot/bbcode-tagger"
