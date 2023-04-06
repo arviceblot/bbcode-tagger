@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 static RE_OPEN_TAG: &str = r#"^\[(?P<tag>[^/\]]+?\S*?)((?:[ \t]+\S+?)?="?(?P<val>[^\]\n]*?))?"?\]"#;
 static RE_CLOSE_TAG: &str = r#"^\[/(?P<tag>[^/\]]+?\S*?)\]"#;
+static RE_NEWLINE: &str = r#"^\r?\n"#;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BBTag {
@@ -17,9 +18,13 @@ pub enum BBTag {
     Center,
     Left,
     Right,
+    Superscript,
+    Subscript,
+    Blur,
     Quote,
     Spoiler,
     Link,
+    Email,
     Image,
     ListOrdered,
     ListUnordered,
@@ -47,6 +52,10 @@ impl BBTag {
             "center" => BBTag::Center,
             "left" => BBTag::Left,
             "right" => BBTag::Right,
+            "sup" => BBTag::Superscript,
+            "sub" => BBTag::Subscript,
+            "blur" => BBTag::Blur,
+            "email" => BBTag::Email,
             "quote" => BBTag::Quote,
             "spoiler" => BBTag::Spoiler,
             "url" => BBTag::Link,
@@ -54,7 +63,7 @@ impl BBTag {
             "ul" | "list" => BBTag::ListUnordered,
             "ol" => BBTag::ListOrdered,
             "li" | "*" => BBTag::ListItem,
-            "code" => BBTag::Code,
+            "code" | "highlight" => BBTag::Code,
             "pre" => BBTag::Preformatted,
             "table" => BBTag::Table,
             "tr" => BBTag::TableRow,
@@ -165,12 +174,14 @@ impl BBTree {
 pub struct BBCode {
     open_matcher: Regex,
     close_matcher: Regex,
+    newline_matcher: Regex,
 }
 impl Default for BBCode {
     fn default() -> Self {
         Self {
             open_matcher: Regex::new(RE_OPEN_TAG).unwrap(),
             close_matcher: Regex::new(RE_CLOSE_TAG).unwrap(),
+            newline_matcher: Regex::new(RE_NEWLINE).unwrap(),
         }
     }
 }
@@ -188,6 +199,18 @@ impl BBCode {
         let mut closed_tag = false;
 
         while !slice.is_empty() {
+            // special handling for [*] short code
+            // check for newline while ListItem is open
+            let captures = self.newline_matcher.captures(slice);
+            if captures.is_some() && tree.get_node(curr_node).tag == BBTag::ListItem {
+                // close list item
+                curr_node = tree.get_node(curr_node).parent.unwrap();
+
+                // move past newline
+                slice = &slice[captures.unwrap().get(0).unwrap().as_str().len()..];
+                closed_tag = true;
+                continue;
+            }
             // check open
             let captures = self.open_matcher.captures(slice);
             if let Some(captures) = captures {
@@ -304,7 +327,13 @@ mod tests {
     fn parse() {
         let parser = BBCode::default();
         // let result = parser.parse("[b]hello[/b]");
-        let tree = parser.parse(r#"wow look at that [i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something"#);
+        let tree = parser.parse(r#"wow look at that [i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something
+[list]
+[*] one item!
+[*]two items
+[*]three [b]items[/b]
+[/list]
+wow"#);
         println!("{}", tree);
 
         // assert_eq!("".to_string(), result.borrow().text);
@@ -315,6 +344,15 @@ mod tests {
         // assert_eq!("hello".to_string(), child.borrow().text);
         // assert_eq!(BBTag::Bold, child.borrow().tag);
     }
+
+    // test [*] short code
+    // [list]
+    // [*]item
+    // [*]item2 yeah[
+    //
+    // [*]three
+    // [*] second [i]things[/i]
+    // [*] trick [/*]
 
     bbtest_all! {
         empty: ("hello", "", "");
