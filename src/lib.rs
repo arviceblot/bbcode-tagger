@@ -202,14 +202,31 @@ impl BBCode {
             // special handling for [*] short code
             // check for newline while ListItem is open
             let captures = self.newline_matcher.captures(slice);
-            if captures.is_some() && tree.get_node(curr_node).tag == BBTag::ListItem {
-                // close list item
-                curr_node = tree.get_node(curr_node).parent.unwrap();
+            if captures.is_some() {
+                if tree.get_node(curr_node).tag == BBTag::ListItem {
+                    // close list item
+                    curr_node = tree.get_node(curr_node).parent.unwrap();
 
-                // move past newline
-                slice = &slice[captures.unwrap().get(0).unwrap().as_str().len()..];
-                closed_tag = true;
-                continue;
+                    // move past newline
+                    slice = &slice[captures.unwrap().get(0).unwrap().as_str().len()..];
+                    closed_tag = true;
+                    continue;
+                }
+                if tree.get_node(curr_node).parent.is_some()
+                    && tree.get_node(tree.get_node(curr_node).parent.unwrap()).tag
+                        == BBTag::ListItem
+                {
+                    // parent is a list item
+                    // close current and parent
+                    curr_node = tree
+                        .get_node(tree.get_node(curr_node).parent.unwrap())
+                        .parent
+                        .unwrap();
+                    // move past newline
+                    slice = &slice[captures.unwrap().get(0).unwrap().as_str().len()..];
+                    closed_tag = true;
+                    continue;
+                }
             }
             // check open
             let captures = self.open_matcher.captures(slice);
@@ -327,13 +344,20 @@ mod tests {
     fn parse() {
         let parser = BBCode::default();
         // let result = parser.parse("[b]hello[/b]");
-        let tree = parser.parse(r#"wow look at that [i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something
-[list]
-[*] one item!
-[*]two items
-[*]three [b]items[/b]
-[/list]
-wow"#);
+        let tree = parser.parse(r#"[SIZE="3"]Features:[/SIZE]
+
+[LIST]
+[*][B][URL=https://github.com/sirinsidiator/ESO-LibAddonMenu/wiki/Controls]Controls[/URL][/B] - LAM offers different control types to build elaborate settings menus
+[*][B]Reset to Default[/B] - LAM can restore the settings to their default state with one key press
+[*][B]Additional AddOn Info[/B] - Add a version label and URLs for website, donations, translations or feedback
+[*][B]AddOn Search[/B] - Can't find the settings for your AddOn between the other hundred entries? No problem! Simply use the text search to quickly find what you are looking for
+[*][B]Slash Commands[/B] - Provides a shortcut to open your settings menu from chat
+[*][B]Tooltips[/B] - In case you need more space to explain what a control does, simply use a tooltip
+[*][B]Warnings[/B] - If your setting causes some unexpected behaviour, you can simply slap a warning on them
+[*][B]Dangerous Buttons[/B] - when flagged as such, a button will have red text and ask for confirmation before it runs any action
+[*][B]Required UI Reload[/B] - For cases where settings have to reload the UI or should be stored to disk right away, LAM offers a user friendly way to ask for a UI reload.
+[*]Support for all 5 official languages and 6 custom localisation projects
+[/LIST]"#);
         println!("{}", tree);
 
         // assert_eq!("".to_string(), result.borrow().text);
