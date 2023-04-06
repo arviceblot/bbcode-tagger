@@ -1,6 +1,6 @@
 [package]
 name = "bbcode-tagger"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["arviceblot <github@relay.arviceblot.com>"]
 description = "BBCode tree parser and tagger"
 edition = "2021"

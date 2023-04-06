@@ -1,12 +1,11 @@
 use regex::Regex;
-use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Display;
-use std::rc::Rc;
 
 static RE_OPEN_TAG: &str = r#"^\[(?P<tag>[^/\]]+?\S*?)((?:[ \t]+\S+?)?="?(?P<val>[^\]\n]*?))?"?\]"#;
 static RE_CLOSE_TAG: &str = r#"^\[/(?P<tag>[^/\]]+?\S*?)\]"#;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BBTag {
     None,
     Bold,
@@ -52,11 +51,9 @@ impl BBTag {
             "spoiler" => BBTag::Spoiler,
             "url" => BBTag::Link,
             "img" => BBTag::Image,
-            "ul" => BBTag::ListUnordered,
-            "list" => BBTag::ListUnordered,
+            "ul" | "list" => BBTag::ListUnordered,
             "ol" => BBTag::ListOrdered,
-            "li" => BBTag::ListItem,
-            "*" => BBTag::ListItem,
+            "li" | "*" => BBTag::ListItem,
             "code" => BBTag::Code,
             "pre" => BBTag::Preformatted,
             "table" => BBTag::Table,
@@ -70,18 +67,13 @@ impl BBTag {
     }
 }
 
-pub enum MatchType {
-    Open,
-    Close,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BBNode {
     pub text: String,
     pub tag: BBTag,
     pub value: Option<String>,
-    pub parent: Option<Rc<RefCell<BBNode>>>,
-    pub children: Vec<Rc<RefCell<BBNode>>>,
+    pub parent: Option<i32>,
+    pub children: Vec<i32>,
 }
 impl Default for BBNode {
     fn default() -> Self {
@@ -92,26 +84,6 @@ impl Default for BBNode {
             parent: None,
             children: vec![],
         }
-    }
-}
-impl Display for BBNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let indent = usize::try_from(self.get_depth() * 2).unwrap();
-        writeln!(f, "{:indent$}Text  : {}", "", self.text, indent = indent)?;
-        writeln!(f, "{:indent$}Tag   : {:?}", "", self.tag, indent = indent)?;
-        writeln!(f, "{:indent$}Value : {:?}", "", self.value, indent = indent)?;
-        writeln!(
-            f,
-            "{:indent$}Parent: {}",
-            "",
-            self.parent.is_some(),
-            indent = indent
-        )?;
-        writeln!(f)?;
-        for child in self.children.iter() {
-            child.borrow().fmt(f)?;
-        }
-        Ok(())
     }
 }
 
@@ -125,11 +97,67 @@ impl BBNode {
             children: vec![],
         }
     }
-    fn get_depth(&self) -> i32 {
-        if self.parent.is_none() {
+}
+
+#[derive(Clone)]
+pub struct BBTree {
+    pub nodes: HashMap<i32, BBNode>,
+    id: i32,
+}
+impl Default for BBTree {
+    fn default() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            id: -1,
+        }
+    }
+}
+impl Display for BBTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_node(f, 0)
+    }
+}
+
+impl BBTree {
+    // Get a node by ID
+    pub fn get_node(&self, i: i32) -> &BBNode {
+        self.nodes.get(&i).unwrap()
+    }
+    // Get a node as mutable by ID
+    pub fn get_node_mut(&mut self, i: i32) -> &mut BBNode {
+        self.nodes.get_mut(&i).unwrap()
+    }
+    // Add a new node and return the new node ID
+    pub fn add_node(&mut self, node: BBNode) -> i32 {
+        self.id += 1;
+        self.nodes.insert(self.id, node);
+        self.id
+    }
+    pub fn get_depth(&self, i: i32) -> usize {
+        if self.get_node(i).parent.is_none() {
             return 0;
         }
-        return 1 + self.parent.as_ref().unwrap().borrow().get_depth();
+        return 1 + self.get_depth(self.get_node(i).parent.unwrap());
+    }
+    fn fmt_node(&self, f: &mut std::fmt::Formatter<'_>, i: i32) -> std::fmt::Result {
+        let indent = self.get_depth(i) * 2;
+        let node = self.get_node(i);
+        writeln!(f, "{:indent$}ID    : {}", "", i, indent = indent)?;
+        writeln!(f, "{:indent$}Text  : {}", "", node.text, indent = indent)?;
+        writeln!(f, "{:indent$}Tag   : {:?}", "", node.tag, indent = indent)?;
+        writeln!(f, "{:indent$}Value : {:?}", "", node.value, indent = indent)?;
+        writeln!(
+            f,
+            "{:indent$}Parent: {:?}",
+            "",
+            node.parent,
+            indent = indent
+        )?;
+        writeln!(f)?;
+        for child in node.children.iter() {
+            self.fmt_node(f, *child)?;
+        }
+        Ok(())
     }
 }
 
@@ -149,14 +177,14 @@ impl Default for BBCode {
 
 impl BBCode {
     #[allow(dead_code)]
-    pub fn parse(&self, input: &str) -> BBNode {
+    pub fn parse(&self, input: &str) -> BBTree {
         // Slice through string until open or close tag match
         let mut slice = &input[0..];
 
         // set up initial tree with empty node
         // let curr_node = BBNode::new("", BBTag::None);
-        let root = Rc::new(RefCell::new(BBNode::default()));
-        let mut curr_node = root.clone();
+        let mut tree = BBTree::default();
+        let mut curr_node = tree.add_node(BBNode::default());
         let mut closed_tag = false;
 
         while !slice.is_empty() {
@@ -167,13 +195,14 @@ impl BBCode {
                 // create child and go deeper
                 let tag = captures.name("tag").unwrap().as_str();
                 let bbtag = BBTag::get_tag(tag);
-                let node = Rc::new(RefCell::new(BBNode::new("", bbtag)));
+                let mut node = BBNode::new("", bbtag);
+                node.parent = Some(curr_node);
                 if let Some(val) = captures.name("val") {
-                    node.borrow_mut().value = Some(val.as_str().to_string());
+                    node.value = Some(val.as_str().to_string());
                 }
-                node.borrow_mut().parent = Some(curr_node.clone());
-                curr_node.borrow_mut().children.push(node.clone());
-                curr_node = node.clone();
+                let new_id = tree.add_node(node);
+                tree.get_node_mut(curr_node).children.push(new_id);
+                curr_node = new_id;
 
                 // increment slice past open tag
                 slice = &slice[captures.get(0).unwrap().as_str().len()..];
@@ -183,11 +212,10 @@ impl BBCode {
                 // if close tag, check current. If same, end child node and go back up. Otherwise toss the tag and keep going.
                 let tag = captures.name("tag").unwrap().as_str();
                 let bbtag = BBTag::get_tag(tag);
-                if bbtag == curr_node.borrow().tag {
+                if bbtag == tree.get_node(curr_node).tag {
                     // matching open and close tags
                     // we're done with this node
-                    let new_curr = curr_node.borrow().parent.clone().unwrap();
-                    curr_node = new_curr.clone();
+                    curr_node = tree.get_node(curr_node).parent.unwrap();
                     // increment slice past close tag
                     slice = &slice[captures.get(0).unwrap().as_str().len()..];
                     closed_tag = true;
@@ -199,14 +227,14 @@ impl BBCode {
             if let Some(ch) = slice.chars().next() {
                 if closed_tag {
                     // we just closed a tag but have more text to get, create a new node
-                    let node = Rc::new(RefCell::new(BBNode::new("", BBTag::None)));
-                    node.borrow_mut().parent = Some(curr_node.clone());
-                    curr_node.borrow_mut().children.push(node.clone());
-                    curr_node = node.clone();
+                    let mut node = BBNode::default();
+                    node.parent = Some(curr_node);
+                    let new_id = tree.add_node(node);
+                    tree.get_node_mut(curr_node).children.push(new_id);
+                    curr_node = new_id;
                 }
 
-                curr_node.borrow_mut().text.push(ch);
-                // curr_node.text.push(ch);
+                tree.get_node_mut(curr_node).text.push(ch);
                 slice = &slice[ch.len_utf8()..];
                 closed_tag = false;
             } else {
@@ -214,8 +242,8 @@ impl BBCode {
                 break;
             }
         }
-        // println!("{}", root.borrow());
-        root.take()
+
+        tree
     }
 }
 
@@ -276,8 +304,8 @@ mod tests {
     fn parse() {
         let parser = BBCode::default();
         // let result = parser.parse("[b]hello[/b]");
-        let result = parser.parse(r#"[i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something"#);
-        println!("{}", result);
+        let tree = parser.parse(r#"wow look at that [i]oh no[/i] KR Patch for [B][SIZE="4"][URL="https://www.esoui.com/downloads/info1245-TamrielTradeCentre.html"][]Tamriel Trade Centre[/][/URL][/SIZE][/B] or something"#);
+        println!("{}", tree);
 
         // assert_eq!("".to_string(), result.borrow().text);
         // assert_eq!(BBTag::None, result.borrow().tag);
