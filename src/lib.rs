@@ -2,7 +2,7 @@
 //!
 //! # Usage
 //! ```rust
-//! use bbcode-tagger;
+//! use bbcode_tagger::BBCode;
 //!
 //! let parser = BBCode::default();
 //! let tree = parser.parse(input);
