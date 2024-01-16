@@ -5,7 +5,7 @@
 //! use bbcode_tagger::BBCode;
 //!
 //! let parser = BBCode::default();
-//! let tree = parser.parse("This is some [B]BBCODE![\B]");
+//! let tree = parser.parse(r"This is some [B]BBCODE![\B]");
 //!
 //! println!("{}", tree);
 //! ```
