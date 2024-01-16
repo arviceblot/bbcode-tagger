@@ -6,6 +6,9 @@ static RE_OPEN_TAG: &str = r#"^\[(?P<tag>[^/\]]+?\S*?)((?:[ \t]+\S+?)?="?(?P<val
 static RE_CLOSE_TAG: &str = r#"^\[/(?P<tag>[^/\]]+?\S*?)\]"#;
 static RE_NEWLINE: &str = r#"^\r?\n"#;
 
+/// TODO: Handle some extra codes
+/// - indent
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BBTag {
     None,
