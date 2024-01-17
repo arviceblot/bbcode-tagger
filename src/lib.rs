@@ -1,5 +1,10 @@
 //! A tree parser and tagger for BBCode formatted text.
 //!
+//! Rather than being a BBCode to HTML converter, this project aims to do something less sane by parsing it into a tree structure.
+//! The slightly sane reasoning for this is to build a generic structure that doesn't depend on a specific output format.
+//! So an HTML formatter could be written for the tree structure rather than the string data itself.
+//! Or the original purpose for this library, to display BBCode formatted text in [egui](https://docs.rs/egui/latest/egui/) for [eso-addon-manager](https://github.com/arviceblot/eso-addons).
+//!
 //! # Usage
 //! ```rust
 //! use bbcode_tagger::BBCode;
@@ -8,6 +13,23 @@
 //! let tree = parser.parse(r"This is some [B]BBCODE![\B]");
 //!
 //! println!("{}", tree);
+//! ```
+//!
+//! The example code should produce an output like:
+//!
+//! ```shell
+//! Nodes: 2
+//! ID    : 0
+//! Text  : This is some
+//! Tag   : None
+//! Value : None
+//! Parent: None
+//!
+//!   ID    : 1
+//!   Text  : BBCODE!
+//!   Tag   : Bold
+//!   Value : None
+//!   Parent: Some(0)
 //! ```
 #![warn(
     missing_docs,
@@ -24,10 +46,8 @@ static RE_OPEN_TAG: &str = r#"^\[(?P<tag>[^/\]]+?\S*?)((?:[ \t]+\S+?)?="?(?P<val
 static RE_CLOSE_TAG: &str = r#"^\[/(?P<tag>[^/\]]+?\S*?)\]"#;
 static RE_NEWLINE: &str = r#"^\r?\n"#;
 
-/// TODO: Handle some extra codes
-/// - indent
-
 /// BBCode tag type enum
+#[allow(missing_docs)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BBTag {
     /// No tag
@@ -61,6 +81,8 @@ pub enum BBTag {
     YouTube,
     /// Some other unhandled tag
     Unknown,
+    // TODO: Handle some extra codes
+    // - indent
 }
 impl From<&str> for BBTag {
     fn from(value: &str) -> BBTag {

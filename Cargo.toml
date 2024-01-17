@@ -6,8 +6,13 @@ description = "BBCode tree parser and tagger"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/arviceblot/bbcode-tagger"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 regex = "1.7.3"
+
+[badges]
+github = { repository = "arviceblot/bbcode-tagger" }
+codecov = { repository = "arviceblot/bbcode-tagger" }
