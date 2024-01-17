@@ -12,7 +12,3 @@ readme = "README.md"
 
 [dependencies]
 regex = "1.7.3"
-
-[badges]
-github = { repository = "arviceblot/bbcode-tagger" }
-codecov = { repository = "arviceblot/bbcode-tagger" }

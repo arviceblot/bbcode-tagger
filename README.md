@@ -1,6 +1,3 @@
-[![Workflow Status](https://github.com/arviceblot/bbcode-tagger/workflows/main/badge.svg)](https://github.com/arviceblot/bbcode-tagger/actions?query=workflow%3A%22main%22)
-[![Coverage Status](https://codecov.io/gh/arviceblot/bbcode-tagger/branch/master/graph/badge.svg)](https://codecov.io/gh/arviceblot/bbcode-tagger)
-
 # bbcode-tagger
 
 A tree parser and tagger for BBCode formatted text.
