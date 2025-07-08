@@ -211,6 +211,130 @@ impl BBTree {
         }
         return 1 + self.get_depth(self.get_node(i).parent.unwrap());
     }
+    /// Convert tree to Markdown
+    pub fn to_markdown(&self) -> String {
+        self.to_markdown_node(0)
+    }
+    fn to_markdown_children(&self, children: &[i32]) -> String {
+        let mut output = String::new();
+        for child in children {
+            output.push_str(&self.to_markdown_node(*child));
+        }
+        output
+    }
+    fn to_markdown_node(&self, i: i32) -> String {
+        let node = self.get_node(i);
+        let mut output = String::new();
+        match node.tag {
+            BBTag::Bold => {
+                output.push_str(
+                    format!(
+                        "**{}{}**",
+                        node.text,
+                        self.to_markdown_children(&node.children)
+                    )
+                    .as_str(),
+                );
+            }
+            BBTag::Italic => {
+                output.push_str(
+                    format!(
+                        "*{}{}*",
+                        node.text,
+                        self.to_markdown_children(&node.children)
+                    )
+                    .as_str(),
+                );
+            }
+            BBTag::Strikethrough => {
+                output.push_str(
+                    format!(
+                        "~~{}{}~~",
+                        node.text,
+                        self.to_markdown_children(&node.children)
+                    )
+                    .as_str(),
+                );
+            }
+            // BBTag::FontSize => {}
+            // BBTag::FontColor => {}
+            // BBTag::Center => {}
+            // BBTag::Left => {}
+            // BBTag::Right => {}
+            // BBTag::Superscript => {}
+            // BBTag::Subscript => {}
+            // BBTag::Blur => {}
+            BBTag::Quote => {
+                output.push_str(
+                    format!(
+                        "> {}{}",
+                        node.text,
+                        self.to_markdown_children(&node.children)
+                    )
+                    .as_str(),
+                );
+            }
+            // BBTag::Spoiler => {}
+            BBTag::Link => {
+                let text = match node.text.is_empty() {
+                    true => node.value.to_owned().unwrap_or("".to_string()),
+                    false => node.text.to_owned(),
+                };
+                output.push_str(
+                    format!(
+                        "[{}]({})",
+                        text,
+                        node.value.to_owned().unwrap_or("".to_string())
+                    )
+                    .as_str(),
+                );
+            }
+            // BBTag::Email => {}
+            BBTag::Image => {
+                let text = match node.text.is_empty() {
+                    true => node.value.to_owned().unwrap_or("".to_string()),
+                    false => node.text.to_owned(),
+                };
+                output.push_str(
+                    format!(
+                        "![{}]({})",
+                        text,
+                        node.value.to_owned().unwrap_or("".to_string())
+                    )
+                    .as_str(),
+                );
+            }
+            // BBTag::ListOrdered => {}
+            // BBTag::ListUnordered => {}
+            // BBTag::ListItem => {}
+            // BBTag::Code => {}
+            // BBTag::Preformatted => {}
+            // BBTag::Table => {}
+            // BBTag::TableHeading => {}
+            // BBTag::TableRow => {}
+            // BBTag::TableCell => {}
+            BBTag::YouTube => {
+                let text = match node.text.is_empty() {
+                    true => node.value.to_owned().unwrap_or("".to_string()),
+                    false => node.text.to_owned(),
+                };
+                output.push_str(
+                    format!(
+                        "[![{}](https://img.youtube.com/vi/{}/0.jpg)](https://www.youtube.com/watch?v={})",
+                        text,
+                        node.value.to_owned().unwrap_or("".to_string()),
+                        node.value.to_owned().unwrap_or("".to_string())
+                    )
+                    .as_str(),
+                );
+            }
+            _ => {
+                output.push_str(node.text.as_str());
+                output.push_str(&self.to_markdown_children(&node.children));
+            }
+        }
+        output
+    }
     fn fmt_node(&self, f: &mut std::fmt::Formatter<'_>, i: i32) -> std::fmt::Result {
         let indent = self.get_depth(i) * 2;
         let node = self.get_node(i);
@@ -957,5 +1081,27 @@ Non listitem text in list.
             ..Default::default()
         };
         assert_ne!(node1, node2);
+    }
+
+    #[test]
+    fn test_markdown() {
+        let input = "[b]hello[/b]";
+        let bbcode = BBCode::default();
+        let tree = bbcode.parse(input);
+        let markdown = tree.to_markdown();
+        assert_eq!("**hello**", markdown);
+    }
+    #[test]
+    fn test_big_markdown() {
+        let input = r#"[b]hello [i]wow[/i][/b] neat!
+link to [url=github.com]GitHub[/url] maybe [size=10]big?[/size]"#;
+        let bbcode = BBCode::default();
+        let tree = bbcode.parse(input);
+        let markdown = tree.to_markdown();
+        assert_eq!(
+            r#"**hello *wow*** neat!
+link to [GitHub](github.com) maybe big?"#,
+            markdown
+        );
     }
 }
